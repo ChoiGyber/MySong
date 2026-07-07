@@ -111,11 +111,12 @@ export class Visualizer {
       const x = i * (bw + gap);
       const y = baseline - bh;
 
-      // Louder bar → brighter, more saturated blue (matches app accent).
+      // Louder bar → deeper, more saturated yellow (app accent).
       const inten = Math.min(1, this.heights[i] * 1.35);
-      const light = 46 + 22 * inten;
+      const hue = 52 - 6 * inten;
+      const light = 74 - 22 * inten;
       const alpha = 0.5 + 0.5 * inten;
-      ctx.fillStyle = `hsla(217, 100%, ${light}%, ${alpha})`;
+      ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
       this.roundRect(ctx, x, y, bw, bh, r);
       ctx.fill();
     }
