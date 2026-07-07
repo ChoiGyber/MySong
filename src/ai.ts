@@ -1,4 +1,7 @@
-// AI settings (localStorage) + related-song recommendations via GPT/Gemini.
+// AI settings + related-song recommendations via GPT/Gemini.
+// API keys live in the OS credential store (DPAPI-protected on Windows);
+// only non-secret preferences go to localStorage.
+import { invoke } from "@tauri-apps/api/core";
 
 export type Provider = "auto" | "gpt" | "gemini";
 
@@ -10,24 +13,51 @@ export interface AiSettings {
 }
 
 const SETTINGS_KEY = "mysong.settings.v1";
+const GPT_SECRET = "gpt_api_key";
+const GEMINI_SECRET = "gemini_api_key";
 
-export function loadSettings(): AiSettings {
+const secretSet = (name: string, value: string) =>
+  invoke<void>("secret_set", { name, value });
+const secretGet = (name: string) =>
+  invoke<string>("secret_get", { name }).catch(() => "");
+
+export async function loadSettings(): Promise<AiSettings> {
   const def: AiSettings = { gptKey: "", geminiKey: "", provider: "auto", relatedCount: 0 };
+  let base = def;
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return def;
-    return { ...def, ...JSON.parse(raw) };
-  } catch {
-    return def;
-  }
-}
-
-export function saveSettings(s: AiSettings) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    base = { ...def, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") };
   } catch {
     /* ignore */
   }
+  let [gptKey, geminiKey] = await Promise.all([secretGet(GPT_SECRET), secretGet(GEMINI_SECRET)]);
+  // One-time migration: move plaintext keys saved by older builds into the
+  // credential store, then scrub them from localStorage.
+  if (base.gptKey || base.geminiKey) {
+    if (base.gptKey && !gptKey) {
+      await secretSet(GPT_SECRET, base.gptKey).catch(() => {});
+      gptKey = base.gptKey;
+    }
+    if (base.geminiKey && !geminiKey) {
+      await secretSet(GEMINI_SECRET, base.geminiKey).catch(() => {});
+      geminiKey = base.geminiKey;
+    }
+    persistPrefs(base.provider, base.relatedCount);
+  }
+  return { gptKey, geminiKey, provider: base.provider, relatedCount: base.relatedCount };
+}
+
+function persistPrefs(provider: Provider, relatedCount: number) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ provider, relatedCount }));
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function saveSettings(s: AiSettings): Promise<void> {
+  persistPrefs(s.provider, s.relatedCount);
+  await secretSet(GPT_SECRET, s.gptKey);
+  await secretSet(GEMINI_SECRET, s.geminiKey);
 }
 
 /** Which provider a request will actually use, or null if no key is usable. */

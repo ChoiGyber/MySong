@@ -346,7 +346,7 @@ async function addYoutube() {
 
 /** Ask the AI for songs similar to `title`, resolve each via YouTube search, add to the list. */
 async function addRelated(title: string) {
-  const s = loadSettings();
+  const s = await loadSettings();
   if (s.relatedCount <= 0 || !activeProvider(s) || !ytReady) return;
   try {
     toast(`관련 음악 ${s.relatedCount}곡 검색 중…`);
@@ -405,8 +405,8 @@ async function checkUpdate() {
   }
 }
 
-function openSettings() {
-  const s = loadSettings();
+async function openSettings() {
+  const s = await loadSettings();
   setGptKey.value = s.gptKey;
   setGeminiKey.value = s.geminiKey;
   setProvider.value = s.provider;
@@ -424,21 +424,25 @@ updateBtn.addEventListener("click", () => {
 getVersion()
   .then((v) => (appVersion.textContent = `v${v}`))
   .catch(() => {});
-settingsBtn.addEventListener("click", openSettings);
+settingsBtn.addEventListener("click", () => void openSettings());
 setCancel.addEventListener("click", () => settingsModal.classList.add("hidden"));
 settingsModal.addEventListener("click", (e) => {
   if (e.target === settingsModal) settingsModal.classList.add("hidden");
 });
-setSave.addEventListener("click", () => {
+setSave.addEventListener("click", async () => {
   const n = Math.max(0, Math.min(10, Math.floor(Number(setRelated.value) || 0)));
-  saveSettings({
-    gptKey: setGptKey.value.trim(),
-    geminiKey: setGeminiKey.value.trim(),
-    provider: setProvider.value as any,
-    relatedCount: n,
-  });
-  settingsModal.classList.add("hidden");
-  toast("설정이 저장되었습니다");
+  try {
+    await saveSettings({
+      gptKey: setGptKey.value.trim(),
+      geminiKey: setGeminiKey.value.trim(),
+      provider: setProvider.value as any,
+      relatedCount: n,
+    });
+    settingsModal.classList.add("hidden");
+    toast("설정이 저장되었습니다 (키는 암호화 저장)");
+  } catch {
+    toast("키 저장에 실패했습니다", true);
+  }
 });
 ytAdd.addEventListener("click", addYoutube);
 ytInput.addEventListener("keydown", (e) => {

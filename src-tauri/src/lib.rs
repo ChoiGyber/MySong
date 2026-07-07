@@ -189,6 +189,29 @@ fn youtube_search(query: String) -> Result<YtSearchItem, String> {
     })
 }
 
+/// Store a secret in the OS credential store (Windows Credential Manager,
+/// DPAPI-protected). An empty value deletes the entry.
+#[tauri::command]
+fn secret_set(name: String, value: String) -> Result<(), String> {
+    let entry = keyring::Entry::new("MySong", &name).map_err(|e| e.to_string())?;
+    if value.is_empty() {
+        let _ = entry.delete_credential();
+        return Ok(());
+    }
+    entry.set_password(&value).map_err(|e| e.to_string())
+}
+
+/// Read a secret from the OS credential store ("" if absent).
+#[tauri::command]
+fn secret_get(name: String) -> Result<String, String> {
+    let entry = keyring::Entry::new("MySong", &name).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(v) => Ok(v),
+        Err(keyring::Error::NoEntry) => Ok(String::new()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 /// Open a URL in the default browser (https only).
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
@@ -228,7 +251,9 @@ pub fn run() {
             youtube_title,
             resolve_youtube,
             youtube_search,
-            open_url
+            open_url,
+            secret_set,
+            secret_get
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
