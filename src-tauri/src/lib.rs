@@ -11,7 +11,7 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Audio file extensions we treat as playable tracks.
 const AUDIO_EXTS: &[&str] = &[
-    "mp3", "wav", "m4a", "flac", "ogg", "oga", "aac", "opus", "wma", "mp4",
+    "mp3", "wav", "m4a", "flac", "ogg", "oga", "aac", "opus", "mp4", "webm", "weba",
 ];
 
 #[derive(Serialize)]

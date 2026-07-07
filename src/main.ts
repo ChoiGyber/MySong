@@ -103,7 +103,7 @@ const dirname = (p: string) => {
   const i = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/"));
   return i >= 0 ? p.slice(0, i) : p;
 };
-const AUDIO_EXTS = ["mp3", "wav", "m4a", "flac", "ogg", "oga", "aac", "opus", "wma", "mp4"];
+const AUDIO_EXTS = ["mp3", "wav", "m4a", "flac", "ogg", "oga", "aac", "opus", "mp4", "webm", "weba"];
 const isAudioExt = (p: string) => AUDIO_EXTS.includes((p.split(".").pop() || "").toLowerCase());
 
 const escHtml = (s: string) =>
