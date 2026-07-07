@@ -1,6 +1,6 @@
 {
   "name": "mysong",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "심플한 MP3/WAV/M4A + YouTube 사운드 플레이어",
   "type": "module",
   "scripts": {
