@@ -5,7 +5,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi";
 
 import { ICONS } from "./icons";
 import { AudioController } from "./player";
-import { Visualizer } from "./visualizer";
+import { Visualizer, BAR_COUNT } from "./visualizer";
 import { Playlist, fileTrack, youtubeTrack, Track } from "./playlist";
 import {
   pickFolder,
@@ -58,6 +58,7 @@ const toastEl = $("toast") as HTMLDivElement;
 // ---------- core objects ----------
 const audio = new AudioController();
 const viz = new Visualizer(waveCanvas);
+viz.setSpectrumSource(() => audio.spectrum(BAR_COUNT));
 const pl = new Playlist(playlistEl);
 const win = getCurrentWindow();
 

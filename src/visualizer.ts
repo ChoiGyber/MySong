@@ -5,7 +5,7 @@
 // both local files and remote (YouTube) streams — a real Web Audio AnalyserNode
 // can't tap cross-origin streams without muting them, so we don't route through it.
 
-const BAR_COUNT = 60;
+export const BAR_COUNT = 60;
 
 export class Visualizer {
   private canvas: HTMLCanvasElement;
@@ -29,6 +29,12 @@ export class Visualizer {
 
   setPlaying(p: boolean) {
     this.playing = p;
+  }
+
+  private spectrumFn: (() => number[] | null) | null = null;
+  /** Provide a real analyser feed; when it returns null the simulation runs. */
+  setSpectrumSource(fn: () => number[] | null) {
+    this.spectrumFn = fn;
   }
 
   setVolume(v: number) {
@@ -78,7 +84,15 @@ export class Visualizer {
 
   private loop = () => {
     this.t += 0.045;
-    this.nextTargets();
+    const real = this.playing ? this.spectrumFn?.() ?? null : null;
+    if (real) {
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Mild curve lift so quiet high-frequency content stays visible.
+        this.targets[i] = Math.max(0.04, Math.pow(real[i] ?? 0, 0.8));
+      }
+    } else {
+      this.nextTargets();
+    }
 
     const { ctx, canvas, dpr } = this;
     const W = canvas.width;
@@ -96,10 +110,12 @@ export class Visualizer {
       const x = i * (bw + gap);
       const y = baseline - bh;
 
-      const grad = ctx.createLinearGradient(0, y, 0, baseline);
-      grad.addColorStop(0, "#ffe27a");
-      grad.addColorStop(1, "#ffcf33");
-      ctx.fillStyle = grad;
+      // Louder bar → deeper, more saturated color (pale yellow → rich orange).
+      const inten = Math.min(1, this.heights[i] * 1.35);
+      const hue = 52 - 24 * inten;
+      const light = 74 - 22 * inten;
+      const alpha = 0.35 + 0.65 * inten;
+      ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
       this.roundRect(ctx, x, y, bw, bh, Math.min(bw / 2, 2.5 * dpr));
       ctx.fill();
     }
