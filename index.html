@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>뮤직플레이어</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ===== Title bar (draggable) ===== -->
+      <header class="titlebar" data-tauri-drag-region>
+        <div class="title" data-tauri-drag-region>
+          <span class="title-note">♪</span>
+          <span class="title-text">뮤직플레이어</span>
+        </div>
+        <div class="title-actions">
+          <button id="collapseBtn" class="win-btn" title="접기/펼치기">▾</button>
+          <button id="minBtn" class="win-btn" title="최소화">–</button>
+          <button id="closeBtn" class="win-btn close" title="닫기">✕</button>
+        </div>
+      </header>
+
+      <section class="body">
+        <!-- ===== Transport controls ===== -->
+        <div class="controls">
+          <button id="playBtn" class="ctrl primary" title="재생/일시정지"></button>
+          <button id="stopBtn" class="ctrl" title="정지"></button>
+          <button id="repeatBtn" class="ctrl" title="반복 모드"></button>
+          <div class="volume">
+            <button id="muteBtn" class="ctrl mute" title="음소거"></button>
+            <input id="volume" class="range vol" type="range" min="0" max="1" step="0.01" value="0.8" />
+          </div>
+        </div>
+
+        <!-- ===== Seek bar ===== -->
+        <div class="seekrow">
+          <span id="curTime" class="time">0:00</span>
+          <input id="seek" class="range seek" type="range" min="0" max="1000" step="1" value="0" />
+          <span id="totTime" class="time">0:00</span>
+        </div>
+
+        <!-- ===== Waveform ===== -->
+        <canvas id="wave" class="wave"></canvas>
+
+        <!-- ===== Now-playing marquee ===== -->
+        <div class="nowplaying">
+          <span id="npText" class="marquee">준비됨</span>
+        </div>
+
+        <!-- ===== Folder import + filter ===== -->
+        <div class="sourcerow collapsible">
+          <button id="folderBtn" class="chip" title="폴더 가져오기">+ 폴더</button>
+          <div class="select-wrap">
+            <select id="folderSelect" class="select" title="폴더 필터">
+              <option value="">폴더 선택</option>
+            </select>
+          </div>
+          <button id="folderClear" class="win-btn small" title="필터 해제">✕</button>
+        </div>
+
+        <!-- ===== YouTube URL ===== -->
+        <div class="ytrow collapsible">
+          <input id="ytInput" class="yt-input" type="text" placeholder="YouTube URL 붙여넣기" spellcheck="false" />
+          <button id="ytAdd" class="add-btn" title="목록에 추가">+</button>
+        </div>
+
+        <!-- ===== Playlist ===== -->
+        <ul id="playlist" class="playlist collapsible" tabindex="0"></ul>
+      </section>
+
+      <!-- ===== Bottom-right resize grip ===== -->
+      <div id="resize" class="resize-grip" title="크기 조절"></div>
+
+      <!-- ===== Toast ===== -->
+      <div id="toast" class="toast hidden"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

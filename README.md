@@ -1,0 +1,75 @@
+# MySong 🎵
+
+Tauri 2 기반의 심플한 사운드 플레이어. 로컬 오디오(mp3/wav/m4a 등)와 YouTube URL을 하나의 목록에서 재생합니다.
+
+![icon](app-icon.png)
+
+## 주요 기능
+
+- **재생 컨트롤**: 재생 / 일시정지 / 정지, 볼륨 슬라이더 + 음소거
+- **탐색 바(플레이바)**: 현재 시간 · 전체 시간 표시, 드래그로 구간 이동
+- **웨이브폼**: 재생 중 노란색 이퀄라이저 바 애니메이션
+- **재생 방법 3가지** (반복 버튼으로 순환)
+  - `1회` — 현재 곡 한 번 재생 후 정지
+  - `1곡 반복` — 현재 곡 무한 반복
+  - `여러곡 반복` — 목록을 순환 반복
+- **파일 추가**
+  - 창으로 **파일/폴더 드래그 앤 드롭**
+  - `+ 폴더` 버튼으로 폴더 가져오기(하위 폴더까지 스캔)
+  - `폴더 선택` 드롭다운으로 특정 폴더만 필터링
+- **YouTube**: 상단 입력창에 URL 붙여넣고 `+` (또는 Enter) → 목록에 추가. 재생 시 `yt-dlp`로 오디오를 추출해 로컬 곡처럼 재생
+- **목록 관리**
+  - 클릭 = 선택, `Ctrl/⌘+클릭` = 다중 선택, `Shift+클릭` = 범위 선택
+  - **드래그로 순서 이동** (다중 선택 시 여러 곡 동시 이동)
+  - `Del` / `Backspace` 또는 각 행의 `✕`로 **목록에서만 삭제** (원본 파일은 그대로)
+  - 곡을 더블클릭하거나 재생 아이콘 클릭 시 재생
+- **창(프레임리스)**: 상단바 드래그로 이동, `▾` 접기/펼치기, `–` 최소화, `✕` 닫기, **우측 하단 모서리로 크기 조절**
+- 목록은 자동 저장되어 다음 실행 시 복원됩니다.
+
+## 실행
+
+```bash
+# 개발 모드 (핫리로드)
+npm install
+npm run tauri dev
+
+# 릴리스 빌드 (설치 파일 생성)
+npm run tauri build
+```
+
+빌드된 실행 파일: `src-tauri/target/release/mysong.exe`
+
+## YouTube 재생 준비 (`yt-dlp`)
+
+YouTube 곡을 **재생**하려면 시스템에 `yt-dlp`가 설치되어 PATH에 있어야 합니다. (URL 추가/목록 관리는 없어도 동작)
+
+```powershell
+winget install yt-dlp        # 또는
+pip install -U yt-dlp        # 또는
+scoop install yt-dlp
+```
+
+설치되어 있지 않으면 로컬 파일 재생은 정상 동작하고, YouTube 곡 재생 시 안내 메시지가 표시됩니다.
+
+## 구조
+
+```
+index.html            # 레이아웃 (커스텀 타이틀바 · 컨트롤 · 웨이브 · 목록)
+src/
+  main.ts             # 전체 배선(이벤트/상태), 창 제어, 파일 드롭
+  player.ts           # <audio> 래퍼 (로컬 asset + 원격 스트림)
+  playlist.ts         # 목록 모델 + 드래그 정렬 · 다중선택 · 삭제
+  visualizer.ts       # 캔버스 웨이브폼(애니메이션)
+  backend.ts          # Tauri 커맨드 래퍼
+  icons.ts            # 인라인 SVG 아이콘
+  styles.css          # 블랙 테마(화이트/노란색 강조)
+src-tauri/
+  src/lib.rs          # scan_folder / ytdlp_available / youtube_title / resolve_youtube
+  tauri.conf.json     # 창 설정 · CSP · asset 프로토콜
+  capabilities/       # 권한(창 제어 · 대화상자)
+```
+
+## 설계 노트
+
+- **웨이브폼**은 로컬/YouTube 모두 동일하게 보이도록 애니메이션 방식으로 구현했습니다. 원격(YouTube) 스트림은 CORS 때문에 Web Audio 분석 시 음소거되는 문제가 있어, 실제 FFT 대신 재생 상태·볼륨에 반응하는 시각화를 사용합니다.
+- **로컬 파일**은 Tauri `asset:` 프로토콜로 스트리밍 재생하여 대용량 파일도 메모리 부담 없이 재생합니다.
