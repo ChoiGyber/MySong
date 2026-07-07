@@ -247,14 +247,17 @@ body {
   padding-left: 0;
 }
 .marquee.scroll {
-  animation: marquee 9s ease-in-out infinite alternate;
+  animation: marquee var(--marquee-duration, 12s) linear infinite;
+}
+.marquee-seg {
+  padding-right: 36px;
 }
 @keyframes marquee {
   0% {
     transform: translateX(0);
   }
   100% {
-    transform: translateX(var(--marquee-shift, 0));
+    transform: translateX(-50%);
   }
 }
 

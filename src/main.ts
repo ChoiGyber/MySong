@@ -87,12 +87,24 @@ function toast(msg: string, err = false) {
 function updateMarquee(text: string) {
   npText.textContent = text;
   npText.classList.remove("scroll");
-  npText.style.removeProperty("--marquee-shift");
+  npText.style.removeProperty("--marquee-duration");
   requestAnimationFrame(() => {
     const parent = npText.parentElement!;
-    const overflow = npText.scrollWidth - parent.clientWidth;
-    if (overflow > 6) {
-      npText.style.setProperty("--marquee-shift", `-${overflow + 10}px`);
+    const textWidth = npText.scrollWidth;
+    if (textWidth - parent.clientWidth > 6) {
+      // 같은 텍스트 두 벌을 이어 붙여 -50% 이동 시 끊김 없이 반복
+      npText.textContent = "";
+      for (let i = 0; i < 2; i++) {
+        const seg = document.createElement("span");
+        seg.className = "marquee-seg";
+        seg.textContent = text;
+        npText.appendChild(seg);
+      }
+      const speed = 28; // px/s
+      npText.style.setProperty(
+        "--marquee-duration",
+        `${(textWidth + 36) / speed}s`,
+      );
       npText.classList.add("scroll");
     }
   });

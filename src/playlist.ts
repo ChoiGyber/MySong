@@ -167,6 +167,8 @@ export class Playlist {
         return;
       }
       this.handleSelect(id, e);
+      // Plain click (no modifier) starts playback immediately.
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) this.onPlay(id);
     });
 
     this.root.addEventListener("dblclick", (e) => {
