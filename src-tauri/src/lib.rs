@@ -65,6 +65,9 @@ fn scan_folder(path: String) -> Vec<TrackFile> {
 
 fn ytdlp() -> Command {
     let mut c = Command::new("yt-dlp");
+    // Force UTF-8 output; otherwise Windows pipes use the locale codepage
+    // (e.g. CP949) and non-ASCII titles arrive garbled.
+    c.env("PYTHONIOENCODING", "utf-8");
     #[cfg(target_os = "windows")]
     c.creation_flags(CREATE_NO_WINDOW);
     c

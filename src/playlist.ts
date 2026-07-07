@@ -136,7 +136,7 @@ export class Playlist {
         const sel = this.selected.has(t.id) ? " selected" : "";
         const playing = t.id === this.currentId ? " playing" : "";
         const icon = t.id === this.currentId ? `<span class="row-icon">${ICONS.play}</span>` : "";
-        const badge = t.source === "youtube" ? `<span class="row-badge">YT</span>` : "";
+        const badge = t.source === "youtube" ? `<span class="row-badge">Y</span>` : "";
         return `<li class="row${sel}${playing}" draggable="true" data-id="${t.id}">
           <span class="row-handle" title="드래그로 이동">≡</span>
           ${icon}${badge}
