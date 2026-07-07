@@ -83,6 +83,18 @@ fn ytdlp_available() -> bool {
         .unwrap_or(false)
 }
 
+/// Decode child-process output: prefer UTF-8, fall back to the Korean
+/// locale codepage (CP949/EUC-KR) when the bytes are not valid UTF-8.
+fn decode_out(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(s) => s.to_string(),
+        Err(_) => {
+            let (s, _, _) = encoding_rs::EUC_KR.decode(bytes);
+            s.into_owned()
+        }
+    }
+}
+
 /// Just the video title — fast, used to label a freshly added YouTube URL.
 #[tauri::command]
 fn youtube_title(url: String) -> Result<String, String> {
@@ -93,7 +105,7 @@ fn youtube_title(url: String) -> Result<String, String> {
     if !out.status.success() {
         return Err(last_err_line(&out.stderr));
     }
-    let title = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let title = decode_out(&out.stdout).trim().to_string();
     if title.is_empty() {
         return Err("제목을 가져오지 못했습니다".into());
     }
@@ -124,7 +136,7 @@ fn resolve_youtube(url: String) -> Result<YtInfo, String> {
     if !out.status.success() {
         return Err(last_err_line(&out.stderr));
     }
-    let text = String::from_utf8_lossy(&out.stdout);
+    let text = decode_out(&out.stdout);
     let title = text
         .lines()
         .find(|l| !l.trim().is_empty() && !l.starts_with("http"))
@@ -145,7 +157,7 @@ fn resolve_youtube(url: String) -> Result<YtInfo, String> {
 }
 
 fn last_err_line(stderr: &[u8]) -> String {
-    let s = String::from_utf8_lossy(stderr);
+    let s = decode_out(stderr);
     let line = s
         .lines()
         .rev()

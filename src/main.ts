@@ -47,7 +47,31 @@ const pl = new Playlist(playlistEl);
 const win = getCurrentWindow();
 
 let ytReady = false;
-ytdlpAvailable().then((v) => (ytReady = v)).catch(() => {});
+ytdlpAvailable()
+  .then((v) => {
+    ytReady = v;
+    if (v) repairBrokenTitles();
+  })
+  .catch(() => {});
+
+/** Re-fetch titles that were saved garbled (contain U+FFFD) or never resolved. */
+function repairBrokenTitles() {
+  for (const t of pl.tracks) {
+    if (t.source !== "youtube" || !t.url) continue;
+    if (!t.title.includes("�") && t.title !== t.url) continue;
+    youtubeTitle(t.url)
+      .then((title) => {
+        if (!title) return;
+        const tk = pl.trackById(t.id);
+        if (tk) {
+          tk.title = title;
+          pl.render();
+          save();
+        }
+      })
+      .catch(() => {});
+  }
+}
 
 // ---------- helpers ----------
 function fmt(s: number): string {
