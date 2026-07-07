@@ -42,3 +42,8 @@ export function youtubeTitle(url: string): Promise<string> {
 export function resolveYoutube(url: string): Promise<YtInfo> {
   return invoke<YtInfo>("resolve_youtube", { url });
 }
+
+/** Search YouTube and return the first matching video (title + page URL). */
+export function youtubeSearch(query: string): Promise<YtInfo> {
+  return invoke<YtInfo>("youtube_search", { query });
+}

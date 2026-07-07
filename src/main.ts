@@ -13,7 +13,9 @@ import {
   ytdlpAvailable,
   youtubeTitle,
   resolveYoutube,
+  youtubeSearch,
 } from "./backend";
+import { loadSettings, saveSettings, activeProvider, relatedSongs } from "./ai";
 
 // ---------- element refs ----------
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -35,6 +37,14 @@ const ytInput = $("ytInput") as HTMLInputElement;
 const ytAdd = $("ytAdd") as HTMLButtonElement;
 const playlistEl = $("playlist") as HTMLUListElement;
 const collapseBtn = $("collapseBtn") as HTMLButtonElement;
+const settingsBtn = $("settingsBtn") as HTMLButtonElement;
+const settingsModal = $("settingsModal") as HTMLDivElement;
+const setGptKey = $("setGptKey") as HTMLInputElement;
+const setGeminiKey = $("setGeminiKey") as HTMLInputElement;
+const setProvider = $("setProvider") as HTMLSelectElement;
+const setRelated = $("setRelated") as HTMLInputElement;
+const setSave = $("setSave") as HTMLButtonElement;
+const setCancel = $("setCancel") as HTMLButtonElement;
 const minBtn = $("minBtn") as HTMLButtonElement;
 const closeBtn = $("closeBtn") as HTMLButtonElement;
 const resizeGrip = $("resize") as HTMLDivElement;
@@ -321,12 +331,62 @@ async function addYoutube() {
           pl.render();
           save();
         }
+        void addRelated(title || url);
       })
-      .catch(() => {});
+      .catch(() => void addRelated(url));
   } else {
     toast("추가됨. 재생하려면 yt-dlp 설치가 필요합니다.", true);
   }
 }
+
+/** Ask the AI for songs similar to `title`, resolve each via YouTube search, add to the list. */
+async function addRelated(title: string) {
+  const s = loadSettings();
+  if (s.relatedCount <= 0 || !activeProvider(s) || !ytReady) return;
+  try {
+    toast(`관련 음악 ${s.relatedCount}곡 검색 중…`);
+    const names = await relatedSongs(title, s.relatedCount, s);
+    const found: Track[] = [];
+    for (const q of names.slice(0, s.relatedCount)) {
+      const r = await youtubeSearch(q).catch(() => null);
+      if (r) found.push(youtubeTrack(r.url, r.title));
+    }
+    if (found.length) {
+      pl.add(found);
+      toast(`관련 음악 ${found.length}곡 추가됨`);
+    } else {
+      toast("관련 음악을 찾지 못했습니다", true);
+    }
+  } catch (e: any) {
+    toast(typeof e === "string" ? e : e?.message || "관련 음악 검색 실패", true);
+  }
+}
+
+// ---------- settings modal ----------
+function openSettings() {
+  const s = loadSettings();
+  setGptKey.value = s.gptKey;
+  setGeminiKey.value = s.geminiKey;
+  setProvider.value = s.provider;
+  setRelated.value = String(s.relatedCount);
+  settingsModal.classList.remove("hidden");
+}
+settingsBtn.addEventListener("click", openSettings);
+setCancel.addEventListener("click", () => settingsModal.classList.add("hidden"));
+settingsModal.addEventListener("click", (e) => {
+  if (e.target === settingsModal) settingsModal.classList.add("hidden");
+});
+setSave.addEventListener("click", () => {
+  const n = Math.max(0, Math.min(10, Math.floor(Number(setRelated.value) || 0)));
+  saveSettings({
+    gptKey: setGptKey.value.trim(),
+    geminiKey: setGeminiKey.value.trim(),
+    provider: setProvider.value as any,
+    relatedCount: n,
+  });
+  settingsModal.classList.add("hidden");
+  toast("설정이 저장되었습니다");
+});
 ytAdd.addEventListener("click", addYoutube);
 ytInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {

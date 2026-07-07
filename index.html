@@ -15,6 +15,7 @@
           <span class="title-text">뮤직플레이어</span>
         </div>
         <div class="title-actions">
+          <button id="settingsBtn" class="win-btn" title="설정">⚙</button>
           <button id="collapseBtn" class="win-btn" title="접기/펼치기">▾</button>
           <button id="minBtn" class="win-btn" title="최소화">–</button>
           <button id="closeBtn" class="win-btn close" title="닫기">✕</button>
@@ -74,6 +75,37 @@
 
       <!-- ===== Toast ===== -->
       <div id="toast" class="toast hidden"></div>
+
+      <!-- ===== Settings modal ===== -->
+      <div id="settingsModal" class="modal hidden">
+        <div class="modal-box">
+          <h3 class="modal-title">설정</h3>
+          <label class="field">
+            <span>GPT API 키</span>
+            <input id="setGptKey" type="password" placeholder="sk-..." spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>Gemini API 키</span>
+            <input id="setGeminiKey" type="password" placeholder="AIza..." spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>사용할 AI</span>
+            <select id="setProvider">
+              <option value="auto">자동 (키가 있는 쪽)</option>
+              <option value="gpt">GPT</option>
+              <option value="gemini">Gemini</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>관련 음악 추가 개수 (0 = 사용 안 함)</span>
+            <input id="setRelated" type="number" min="0" max="10" step="1" value="0" />
+          </label>
+          <div class="modal-actions">
+            <button id="setSave" class="chip">저장</button>
+            <button id="setCancel" class="chip ghost">취소</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

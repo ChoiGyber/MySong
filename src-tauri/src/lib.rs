@@ -156,6 +156,39 @@ fn resolve_youtube(url: String) -> Result<YtInfo, String> {
     Ok(YtInfo { title, url: media })
 }
 
+#[derive(Serialize)]
+pub struct YtSearchItem {
+    title: String,
+    url: String,
+}
+
+/// Search YouTube for `query` and return the first matching video.
+#[tauri::command]
+fn youtube_search(query: String) -> Result<YtSearchItem, String> {
+    let out = ytdlp()
+        .args([
+            "--flat-playlist",
+            "--print",
+            "%(id)s\t%(title)s",
+            &format!("ytsearch1:{query}"),
+        ])
+        .output()
+        .map_err(|e| format!("yt-dlp 실행 실패: {e}"))?;
+    if !out.status.success() {
+        return Err(last_err_line(&out.stderr));
+    }
+    let text = decode_out(&out.stdout);
+    let line = text
+        .lines()
+        .find(|l| l.contains('\t'))
+        .ok_or("검색 결과가 없습니다")?;
+    let (id, title) = line.split_once('\t').unwrap();
+    Ok(YtSearchItem {
+        title: title.trim().to_string(),
+        url: format!("https://www.youtube.com/watch?v={}", id.trim()),
+    })
+}
+
 fn last_err_line(stderr: &[u8]) -> String {
     let s = decode_out(stderr);
     let line = s
@@ -174,7 +207,8 @@ pub fn run() {
             scan_folder,
             ytdlp_available,
             youtube_title,
-            resolve_youtube
+            resolve_youtube,
+            youtube_search
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
