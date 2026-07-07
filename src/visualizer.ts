@@ -5,7 +5,7 @@
 // both local files and remote (YouTube) streams — a real Web Audio AnalyserNode
 // can't tap cross-origin streams without muting them, so we don't route through it.
 
-const BAR_COUNT = 44;
+const BAR_COUNT = 60;
 
 export class Visualizer {
   private canvas: HTMLCanvasElement;
@@ -44,25 +44,34 @@ export class Visualizer {
   }
 
   private nextTargets() {
-    // Spectrum-shaped pseudo-analyser: bass on the left (tall, slow swells,
-    // pulsing on a common beat), treble on the right (short, fast flicker).
+    // 60-band pseudo-spectrum in three zones:
+    //   left  (0.00–0.33)  low  — tall bars, slow swells, strong beat pulse
+    //   mid   (0.33–0.66)  mid  — medium height and motion, light pulse
+    //   right (0.66–1.00)  high — short bars, fast sparkly flicker
     const beat = 0.55 + 0.45 * Math.max(0, Math.sin(this.t * 2.2)) ** 2;
     for (let i = 0; i < BAR_COUNT; i++) {
       if (!this.playing) {
         this.targets[i] = 0.05;
         continue;
       }
-      const x = i / (BAR_COUNT - 1); // 0 = bass … 1 = treble
-      const envelope = 1 - 0.58 * x; // low end carries more energy
-      const speed = 1.6 + 5.2 * x; // highs oscillate faster
+      const x = i / (BAR_COUNT - 1); // 0 = low … 1 = high
+      // Zone weights: smooth crossfade between low / mid / high characters.
+      const low = Math.max(0, 1 - x * 3); // 1 → 0 across the left third
+      const high = Math.max(0, (x - 2 / 3) * 3); // 0 → 1 across the right third
+      const mid = 1 - low - high;
+
+      const envelope = low * 1.0 + mid * 0.72 + high * 0.45; // energy per zone
+      const speed = low * 1.4 + mid * 3.2 + high * 7.0; // oscillation speed per zone
       const a = Math.sin(this.t * speed + i * 0.7);
       const b = Math.sin(this.t * speed * 1.9 + i * 0.31 + 1.3);
-      let v = 0.5 + 0.5 * (a * 0.55 + b * 0.45);
+      const sparkle = high * 0.3 * Math.sin(this.t * 11 + i * 2.1); // extra treble shimmer
+      let v = 0.5 + 0.5 * (a * 0.55 + b * 0.45 + sparkle);
+      v = Math.max(0, v);
       v = v * v; // punchier peaks
-      const bassPulse = 0.7 + 0.3 * beat * (1 - x); // beat hits the left hardest
+      const pulse = 0.7 + 0.3 * beat * (low + mid * 0.35); // beat hits lows hardest
       this.targets[i] = Math.max(
         0.06,
-        v * envelope * bassPulse * (0.45 + 0.55 * this.volume)
+        v * envelope * pulse * (0.45 + 0.55 * this.volume)
       );
     }
   }
