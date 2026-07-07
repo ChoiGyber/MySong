@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "My Song",
+        "title": "MySong",
         "label": "main",
         "width": 340,
         "height": 640,
