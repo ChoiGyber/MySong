@@ -44,20 +44,26 @@ export class Visualizer {
   }
 
   private nextTargets() {
-    // Smooth pseudo-spectrum: layered sines with a mild center emphasis.
+    // Spectrum-shaped pseudo-analyser: bass on the left (tall, slow swells,
+    // pulsing on a common beat), treble on the right (short, fast flicker).
+    const beat = 0.55 + 0.45 * Math.max(0, Math.sin(this.t * 2.2)) ** 2;
     for (let i = 0; i < BAR_COUNT; i++) {
       if (!this.playing) {
         this.targets[i] = 0.05;
         continue;
       }
-      const x = i / BAR_COUNT;
-      const center = 1 - Math.abs(x - 0.5) * 1.3; // louder in the middle
-      const a = Math.sin(this.t * 2.1 + i * 0.55);
-      const b = Math.sin(this.t * 3.7 + i * 0.27 + 1.3);
-      const c = Math.sin(this.t * 5.3 + i * 0.9);
-      let v = 0.5 + 0.5 * (a * 0.5 + b * 0.32 + c * 0.18);
+      const x = i / (BAR_COUNT - 1); // 0 = bass … 1 = treble
+      const envelope = 1 - 0.58 * x; // low end carries more energy
+      const speed = 1.6 + 5.2 * x; // highs oscillate faster
+      const a = Math.sin(this.t * speed + i * 0.7);
+      const b = Math.sin(this.t * speed * 1.9 + i * 0.31 + 1.3);
+      let v = 0.5 + 0.5 * (a * 0.55 + b * 0.45);
       v = v * v; // punchier peaks
-      this.targets[i] = Math.max(0.06, v * center * (0.45 + 0.55 * this.volume));
+      const bassPulse = 0.7 + 0.3 * beat * (1 - x); // beat hits the left hardest
+      this.targets[i] = Math.max(
+        0.06,
+        v * envelope * bassPulse * (0.45 + 0.55 * this.volume)
+      );
     }
   }
 
