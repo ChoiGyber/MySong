@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "뮤직플레이어",
+        "title": "My Song",
         "label": "main",
         "width": 340,
         "height": 640,
