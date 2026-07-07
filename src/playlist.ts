@@ -137,7 +137,7 @@ export class Playlist {
         const playing = t.id === this.currentId ? " playing" : "";
         const icon = t.id === this.currentId ? `<span class="row-icon">${ICONS.play}</span>` : "";
         const badge = t.source === "youtube" ? `<span class="row-badge">Y</span>` : "";
-        return `<li class="row${sel}${playing}" draggable="true" data-id="${t.id}">
+        return `<li class="row${sel}${playing}" data-id="${t.id}">
           <span class="row-handle" title="드래그로 이동">≡</span>
           ${icon}${badge}
           <span class="row-title" title="${escapeAttr(t.title)}">${escapeHtml(t.title)}</span>
@@ -161,6 +161,7 @@ export class Playlist {
       }
       const row = target.closest<HTMLElement>(".row");
       if (!row) return;
+      if (target.closest(".row-handle")) return; // handle is for dragging only
       const id = row.dataset.id!;
       if (target.closest(".row-icon")) {
         this.onPlay(id);
@@ -191,10 +192,13 @@ export class Playlist {
       }
     });
 
-    // Drag reorder (+ multi-drag)
-    this.root.addEventListener("dragstart", (e) => {
-      const row = (e.target as HTMLElement).closest<HTMLElement>(".row");
-      if (!row) return;
+    // Pointer-based drag reorder via the ≡ handle.
+    // (HTML5 DnD is unavailable: Tauri's OS drag-drop handler intercepts it.)
+    this.root.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const handle = (e.target as HTMLElement).closest<HTMLElement>(".row-handle");
+      if (!handle) return;
+      const row = handle.closest<HTMLElement>(".row")!;
       const id = row.dataset.id!;
       if (!this.selected.has(id)) {
         this.selected = new Set([id]);
@@ -205,38 +209,43 @@ export class Playlist {
       this.dragIds = this.visible()
         .filter((t) => this.selected.has(t.id))
         .map((t) => t.id);
-      e.dataTransfer?.setData("text/plain", this.dragIds.join(","));
-      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-      requestAnimationFrame(() => {
+      e.preventDefault();
+
+      const markDragging = () => {
         this.root.querySelectorAll(".row").forEach((r) => {
-          if (this.dragIds.includes((r as HTMLElement).dataset.id!)) r.classList.add("dragging");
+          r.classList.toggle(
+            "dragging",
+            this.dragIds.includes((r as HTMLElement).dataset.id!)
+          );
         });
-      });
-    });
+      };
+      markDragging();
 
-    this.root.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-      const row = (e.target as HTMLElement).closest<HTMLElement>(".row");
-      this.clearDropMarks();
-      if (!row) return;
-      const rect = row.getBoundingClientRect();
-      const after = e.clientY > rect.top + rect.height / 2;
-      row.classList.add(after ? "drop-after" : "drop-before");
-    });
+      const rowAt = (x: number, y: number) =>
+        document.elementFromPoint(x, y)?.closest<HTMLElement>(".row") ?? null;
 
-    this.root.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const row = (e.target as HTMLElement).closest<HTMLElement>(".row");
-      if (row && this.dragIds.length) {
-        const rect = row.getBoundingClientRect();
-        const after = e.clientY > rect.top + rect.height / 2;
-        this.moveIds(this.dragIds, row.dataset.id!, after);
-      }
-      this.finishDrag();
+      const onMove = (ev: PointerEvent) => {
+        this.clearDropMarks();
+        const over = rowAt(ev.clientX, ev.clientY);
+        if (!over) return;
+        const rect = over.getBoundingClientRect();
+        const after = ev.clientY > rect.top + rect.height / 2;
+        over.classList.add(after ? "drop-after" : "drop-before");
+      };
+      const onUp = (ev: PointerEvent) => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        const over = rowAt(ev.clientX, ev.clientY);
+        if (over && this.dragIds.length) {
+          const rect = over.getBoundingClientRect();
+          const after = ev.clientY > rect.top + rect.height / 2;
+          this.moveIds(this.dragIds, over.dataset.id!, after);
+        }
+        this.finishDrag();
+      };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
     });
-
-    this.root.addEventListener("dragend", () => this.finishDrag());
   }
 
   private handleSelect(id: string, e: MouseEvent) {

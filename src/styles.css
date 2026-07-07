@@ -418,6 +418,8 @@ body {
   cursor: grab;
   flex: 0 0 auto;
   line-height: 1;
+  touch-action: none;
+  user-select: none;
 }
 .row-icon {
   flex: 0 0 auto;
