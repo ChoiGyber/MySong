@@ -99,24 +99,24 @@ export class Visualizer {
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    const gap = 2 * dpr;
+    // ---- Digital-mixer RTA bars: thin blue frequency bars, louder → brighter.
+    const gap = 1.5 * dpr;
     const bw = (W - gap * (BAR_COUNT - 1)) / BAR_COUNT;
-    const baseline = H - 2 * dpr;
+    const baseline = H - 1.5 * dpr;
+    const r = Math.min(bw / 2, 1.5 * dpr);
 
     for (let i = 0; i < BAR_COUNT; i++) {
-      // Ease current height toward target.
-      this.heights[i] += (this.targets[i] - this.heights[i]) * 0.22;
-      const bh = Math.max(2 * dpr, this.heights[i] * (H - 4 * dpr));
+      this.heights[i] += (this.targets[i] - this.heights[i]) * 0.28;
+      const bh = Math.max(2 * dpr, this.heights[i] * (baseline - 2 * dpr));
       const x = i * (bw + gap);
       const y = baseline - bh;
 
-      // Louder bar → deeper, more saturated color (pale yellow → rich orange).
+      // Louder bar → brighter, more saturated blue (matches app accent).
       const inten = Math.min(1, this.heights[i] * 1.35);
-      const hue = 52 - 24 * inten;
-      const light = 74 - 22 * inten;
-      const alpha = 0.35 + 0.65 * inten;
-      ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
-      this.roundRect(ctx, x, y, bw, bh, Math.min(bw / 2, 2.5 * dpr));
+      const light = 46 + 22 * inten;
+      const alpha = 0.5 + 0.5 * inten;
+      ctx.fillStyle = `hsla(217, 100%, ${light}%, ${alpha})`;
+      this.roundRect(ctx, x, y, bw, bh, r);
       ctx.fill();
     }
 
