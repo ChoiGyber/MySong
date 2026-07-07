@@ -384,6 +384,8 @@ body {
   background: var(--panel);
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s;
+  touch-action: none;
+  user-select: none;
 }
 .row:hover {
   background: var(--panel-2);
@@ -411,15 +413,6 @@ body {
 }
 .row.dragging {
   opacity: 0.4;
-}
-.row-handle {
-  color: var(--muted);
-  font-size: 13px;
-  cursor: grab;
-  flex: 0 0 auto;
-  line-height: 1;
-  touch-action: none;
-  user-select: none;
 }
 .row-icon {
   flex: 0 0 auto;

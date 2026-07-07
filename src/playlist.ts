@@ -34,6 +34,7 @@ export class Playlist {
   private filter = "";
   private root: HTMLUListElement;
   private dragIds: string[] = [];
+  private didDrag = false;
 
   onPlay: (id: string) => void = () => {};
   onChange: () => void = () => {};
@@ -138,7 +139,6 @@ export class Playlist {
         const icon = t.id === this.currentId ? `<span class="row-icon">${ICONS.play}</span>` : "";
         const badge = t.source === "youtube" ? `<span class="row-badge">Y</span>` : "";
         return `<li class="row${sel}${playing}" data-id="${t.id}">
-          <span class="row-handle" title="드래그로 이동">≡</span>
           ${icon}${badge}
           <span class="row-title" title="${escapeAttr(t.title)}">${escapeHtml(t.title)}</span>
           <button class="row-del" title="목록에서 삭제" data-del="${t.id}">✕</button>
@@ -161,7 +161,10 @@ export class Playlist {
       }
       const row = target.closest<HTMLElement>(".row");
       if (!row) return;
-      if (target.closest(".row-handle")) return; // handle is for dragging only
+      if (this.didDrag) {
+        this.didDrag = false; // a drag just ended — swallow the click
+        return;
+      }
       const id = row.dataset.id!;
       if (target.closest(".row-icon")) {
         this.onPlay(id);
@@ -192,26 +195,35 @@ export class Playlist {
       }
     });
 
-    // Pointer-based drag reorder via the ≡ handle.
+    // Pointer-based drag reorder on the whole row; a drag begins only after
+    // the pointer moves past a small threshold so plain clicks still play.
     // (HTML5 DnD is unavailable: Tauri's OS drag-drop handler intercepts it.)
     this.root.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
-      const handle = (e.target as HTMLElement).closest<HTMLElement>(".row-handle");
-      if (!handle) return;
-      const row = handle.closest<HTMLElement>(".row")!;
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-del]")) return;
+      const row = target.closest<HTMLElement>(".row");
+      if (!row) return;
       const id = row.dataset.id!;
-      if (!this.selected.has(id)) {
-        this.selected = new Set([id]);
-        this.anchorId = id;
-        this.render();
-      }
-      // Preserve visible order of the dragged set.
-      this.dragIds = this.visible()
-        .filter((t) => this.selected.has(t.id))
-        .map((t) => t.id);
-      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragging = false;
 
-      const markDragging = () => {
+      const rowAt = (x: number, y: number) =>
+        document.elementFromPoint(x, y)?.closest<HTMLElement>(".row") ?? null;
+
+      const beginDrag = () => {
+        dragging = true;
+        this.didDrag = true;
+        if (!this.selected.has(id)) {
+          this.selected = new Set([id]);
+          this.anchorId = id;
+          this.render();
+        }
+        // Preserve visible order of the dragged set.
+        this.dragIds = this.visible()
+          .filter((t) => this.selected.has(t.id))
+          .map((t) => t.id);
         this.root.querySelectorAll(".row").forEach((r) => {
           r.classList.toggle(
             "dragging",
@@ -219,12 +231,12 @@ export class Playlist {
           );
         });
       };
-      markDragging();
-
-      const rowAt = (x: number, y: number) =>
-        document.elementFromPoint(x, y)?.closest<HTMLElement>(".row") ?? null;
 
       const onMove = (ev: PointerEvent) => {
+        if (!dragging) {
+          if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 6) return;
+          beginDrag();
+        }
         this.clearDropMarks();
         const over = rowAt(ev.clientX, ev.clientY);
         if (!over) return;
@@ -235,11 +247,13 @@ export class Playlist {
       const onUp = (ev: PointerEvent) => {
         document.removeEventListener("pointermove", onMove);
         document.removeEventListener("pointerup", onUp);
-        const over = rowAt(ev.clientX, ev.clientY);
-        if (over && this.dragIds.length) {
-          const rect = over.getBoundingClientRect();
-          const after = ev.clientY > rect.top + rect.height / 2;
-          this.moveIds(this.dragIds, over.dataset.id!, after);
+        if (dragging && this.dragIds.length) {
+          const over = rowAt(ev.clientX, ev.clientY);
+          if (over) {
+            const rect = over.getBoundingClientRect();
+            const after = ev.clientY > rect.top + rect.height / 2;
+            this.moveIds(this.dragIds, over.dataset.id!, after);
+          }
         }
         this.finishDrag();
       };
