@@ -598,3 +598,35 @@ body {
 .chip.ghost {
   opacity: 0.7;
 }
+
+/* ===== Settings modal footer ===== */
+.modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+}
+.modal-foot a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.modal-foot a:hover {
+  text-decoration: underline;
+}
+.modal-foot .ver {
+  color: var(--muted);
+  flex: 1 1 auto;
+}
+.chip.small-chip {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+}
+.chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}

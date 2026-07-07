@@ -47,3 +47,8 @@ export function resolveYoutube(url: string): Promise<YtInfo> {
 export function youtubeSearch(query: string): Promise<YtInfo> {
   return invoke<YtInfo>("youtube_search", { query });
 }
+
+/** Open an https URL in the default browser. */
+export function openUrl(url: string): Promise<void> {
+  return invoke<void>("open_url", { url });
+}

@@ -189,6 +189,25 @@ fn youtube_search(query: String) -> Result<YtSearchItem, String> {
     })
 }
 
+/// Open a URL in the default browser (https only).
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("https URL만 열 수 있습니다".into());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut c = Command::new("cmd");
+        c.args(["/C", "start", "", &url]).creation_flags(CREATE_NO_WINDOW);
+        c.spawn().map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new("open").arg(&url).spawn().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn last_err_line(stderr: &[u8]) -> String {
     let s = decode_out(stderr);
     let line = s
@@ -208,7 +227,8 @@ pub fn run() {
             ytdlp_available,
             youtube_title,
             resolve_youtube,
-            youtube_search
+            youtube_search,
+            open_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

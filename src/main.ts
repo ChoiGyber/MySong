@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 
@@ -14,6 +15,7 @@ import {
   youtubeTitle,
   resolveYoutube,
   youtubeSearch,
+  openUrl,
 } from "./backend";
 import { loadSettings, saveSettings, activeProvider, relatedSongs } from "./ai";
 
@@ -45,6 +47,9 @@ const setProvider = $("setProvider") as HTMLSelectElement;
 const setRelated = $("setRelated") as HTMLInputElement;
 const setSave = $("setSave") as HTMLButtonElement;
 const setCancel = $("setCancel") as HTMLButtonElement;
+const ghLink = $("ghLink") as HTMLAnchorElement;
+const appVersion = $("appVersion") as HTMLSpanElement;
+const updateBtn = $("updateBtn") as HTMLButtonElement;
 const minBtn = $("minBtn") as HTMLButtonElement;
 const closeBtn = $("closeBtn") as HTMLButtonElement;
 const resizeGrip = $("resize") as HTMLDivElement;
@@ -363,6 +368,43 @@ async function addRelated(title: string) {
 }
 
 // ---------- settings modal ----------
+const REPO_URL = "https://github.com/ChoiGyber/MySong";
+let latestReleaseUrl = "";
+
+function cmpVer(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** Enable the update button only when a newer GitHub release exists. */
+async function checkUpdate() {
+  updateBtn.disabled = true;
+  updateBtn.textContent = "확인 중…";
+  try {
+    const [res, cur] = await Promise.all([
+      fetch("https://api.github.com/repos/ChoiGyber/MySong/releases/latest"),
+      getVersion(),
+    ]);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const latest = String(data.tag_name || "").replace(/^v/, "");
+    if (latest && cmpVer(latest, cur) > 0) {
+      latestReleaseUrl = data.html_url || `${REPO_URL}/releases`;
+      updateBtn.textContent = `v${latest} 업데이트`;
+      updateBtn.disabled = false;
+    } else {
+      updateBtn.textContent = "최신 버전입니다";
+    }
+  } catch {
+    updateBtn.textContent = "업데이트 확인 실패";
+  }
+}
+
 function openSettings() {
   const s = loadSettings();
   setGptKey.value = s.gptKey;
@@ -370,7 +412,18 @@ function openSettings() {
   setProvider.value = s.provider;
   setRelated.value = String(s.relatedCount);
   settingsModal.classList.remove("hidden");
+  void checkUpdate();
 }
+ghLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  void openUrl(REPO_URL).catch(() => {});
+});
+updateBtn.addEventListener("click", () => {
+  if (latestReleaseUrl) void openUrl(latestReleaseUrl).catch(() => {});
+});
+getVersion()
+  .then((v) => (appVersion.textContent = `v${v}`))
+  .catch(() => {});
 settingsBtn.addEventListener("click", openSettings);
 setCancel.addEventListener("click", () => settingsModal.classList.add("hidden"));
 settingsModal.addEventListener("click", (e) => {
