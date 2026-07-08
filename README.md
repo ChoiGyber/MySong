@@ -39,17 +39,11 @@ npm run tauri build
 
 빌드된 실행 파일: `src-tauri/target/release/mysong.exe`
 
-## YouTube 재생 준비 (`yt-dlp`)
+## YouTube 재생 (`yt-dlp` 내장)
 
-YouTube 곡을 **재생**하려면 시스템에 `yt-dlp`가 설치되어 PATH에 있어야 합니다. (URL 추가/목록 관리는 없어도 동작)
+`yt-dlp`는 앱에 **번들로 내장**되어 있어 별도 설치가 필요 없습니다. 설치된 릴리즈/빌드된 실행 파일만으로 YouTube 곡 재생이 동작합니다. (시스템 PATH에 `yt-dlp`가 따로 있으면 내장본이 없을 때 그것으로 자동 폴백)
 
-```powershell
-winget install yt-dlp        # 또는
-pip install -U yt-dlp        # 또는
-scoop install yt-dlp
-```
-
-설치되어 있지 않으면 로컬 파일 재생은 정상 동작하고, YouTube 곡 재생 시 안내 메시지가 표시됩니다.
+> 소스에서 직접 빌드할 경우 `src-tauri/resources/yt-dlp.exe`가 있어야 번들됩니다. 저장소에 포함되어 있으며, 갱신하려면 최신 `yt-dlp.exe`로 교체하세요.
 
 ## 구조
 

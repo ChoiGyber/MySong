@@ -52,6 +52,7 @@ const appVersion = $("appVersion") as HTMLSpanElement;
 const updateBtn = $("updateBtn") as HTMLButtonElement;
 const minBtn = $("minBtn") as HTMLButtonElement;
 const closeBtn = $("closeBtn") as HTMLButtonElement;
+const pinBtn = $("pinBtn") as HTMLButtonElement;
 const resizeGrip = $("resize") as HTMLDivElement;
 const toastEl = $("toast") as HTMLDivElement;
 
@@ -463,6 +464,19 @@ pl.onChange = () => {
 // ---------- window controls ----------
 closeBtn.addEventListener("click", () => void win.close());
 minBtn.addEventListener("click", () => void win.minimize());
+
+// Always-on-top toggle (pin)
+let pinned = false;
+pinBtn.addEventListener("click", async () => {
+  pinned = !pinned;
+  try {
+    await win.setAlwaysOnTop(pinned);
+    pinBtn.classList.toggle("active", pinned);
+    pinBtn.title = pinned ? "항상 위에 고정 해제" : "항상 위에 고정";
+  } catch {
+    pinned = !pinned; // revert on failure
+  }
+});
 
 const COMPACT_H = 214;
 let collapsed = false;

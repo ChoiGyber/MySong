@@ -5,7 +5,7 @@
 // both local files and remote (YouTube) streams — a real Web Audio AnalyserNode
 // can't tap cross-origin streams without muting them, so we don't route through it.
 
-export const BAR_COUNT = 60;
+export const BAR_COUNT = 24;
 
 export class Visualizer {
   private canvas: HTMLCanvasElement;
@@ -54,7 +54,8 @@ export class Visualizer {
     //   left  (0.00–0.33)  low  — tall bars, slow swells, strong beat pulse
     //   mid   (0.33–0.66)  mid  — medium height and motion, light pulse
     //   right (0.66–1.00)  high — short bars, fast sparkly flicker
-    const beat = 0.55 + 0.45 * Math.max(0, Math.sin(this.t * 2.2)) ** 2;
+    // Gentle, slow beat swell — keeps motion musical rather than frantic.
+    const beat = 0.7 + 0.3 * Math.max(0, Math.sin(this.t * 1.4)) ** 2;
     for (let i = 0; i < BAR_COUNT; i++) {
       if (!this.playing) {
         this.targets[i] = 0.05;
@@ -66,24 +67,24 @@ export class Visualizer {
       const high = Math.max(0, (x - 2 / 3) * 3); // 0 → 1 across the right third
       const mid = 1 - low - high;
 
-      const envelope = low * 1.0 + mid * 0.72 + high * 0.45; // energy per zone
-      const speed = low * 1.4 + mid * 3.2 + high * 7.0; // oscillation speed per zone
-      const a = Math.sin(this.t * speed + i * 0.7);
-      const b = Math.sin(this.t * speed * 1.9 + i * 0.31 + 1.3);
-      const sparkle = high * 0.3 * Math.sin(this.t * 11 + i * 2.1); // extra treble shimmer
-      let v = 0.5 + 0.5 * (a * 0.55 + b * 0.45 + sparkle);
+      const envelope = low * 1.0 + mid * 0.78 + high * 0.55; // energy per zone
+      const speed = low * 0.7 + mid * 1.4 + high * 2.4; // slower oscillation per zone
+      const a = Math.sin(this.t * speed + i * 0.5);
+      const b = Math.sin(this.t * speed * 1.6 + i * 0.23 + 1.3);
+      const sparkle = high * 0.08 * Math.sin(this.t * 5 + i * 1.3); // subtle treble shimmer
+      let v = 0.5 + 0.5 * (a * 0.6 + b * 0.4 + sparkle);
       v = Math.max(0, v);
-      v = v * v; // punchier peaks
-      const pulse = 0.7 + 0.3 * beat * (low + mid * 0.35); // beat hits lows hardest
+      v = Math.pow(v, 1.4); // softer, rounder peaks (less punchy)
+      const pulse = 0.82 + 0.18 * beat * (low + mid * 0.4); // gentle beat, hits lows most
       this.targets[i] = Math.max(
         0.06,
-        v * envelope * pulse * (0.45 + 0.55 * this.volume)
+        v * envelope * pulse * (0.5 + 0.5 * this.volume)
       );
     }
   }
 
   private loop = () => {
-    this.t += 0.045;
+    this.t += 0.022;
     const real = this.playing ? this.spectrumFn?.() ?? null : null;
     if (real) {
       for (let i = 0; i < BAR_COUNT; i++) {
@@ -99,16 +100,18 @@ export class Visualizer {
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // ---- Digital-mixer RTA bars: thin blue frequency bars, louder → brighter.
-    const gap = 1.5 * dpr;
-    const bw = (W - gap * (BAR_COUNT - 1)) / BAR_COUNT;
+    // ---- Center-symmetric mirror spectrum: low freq at center, high at edges.
+    // Each band is mirrored to both sides of the center; louder → brighter yellow.
+    const gap = 4 * dpr;
+    const cx = W / 2;
+    const barW = cx / BAR_COUNT; // width per side / band count
+    const bw = Math.max(1, barW - gap);
     const baseline = H - 1.5 * dpr;
     const r = Math.min(bw / 2, 1.5 * dpr);
 
     for (let i = 0; i < BAR_COUNT; i++) {
-      this.heights[i] += (this.targets[i] - this.heights[i]) * 0.28;
+      this.heights[i] += (this.targets[i] - this.heights[i]) * 0.16;
       const bh = Math.max(2 * dpr, this.heights[i] * (baseline - 2 * dpr));
-      const x = i * (bw + gap);
       const y = baseline - bh;
 
       // Louder bar → deeper, more saturated yellow (app accent).
@@ -117,7 +120,11 @@ export class Visualizer {
       const light = 74 - 22 * inten;
       const alpha = 0.5 + 0.5 * inten;
       ctx.fillStyle = `hsla(${hue}, 100%, ${light}%, ${alpha})`;
-      this.roundRect(ctx, x, y, bw, bh, r);
+
+      // Right half (center → right edge) and mirrored left half.
+      this.roundRect(ctx, cx + i * barW, y, bw, bh, r);
+      ctx.fill();
+      this.roundRect(ctx, cx - (i + 1) * barW, y, bw, bh, r);
       ctx.fill();
     }
 

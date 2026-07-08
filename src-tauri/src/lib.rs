@@ -63,8 +63,31 @@ fn scan_folder(path: String) -> Vec<TrackFile> {
     out
 }
 
+/// Resolve the yt-dlp binary. Prefer the copy bundled with the app (so it works
+/// with no system install and survives antivirus blocking of network installs),
+/// then fall back to `yt-dlp` on PATH.
+fn ytdlp_program() -> std::ffi::OsString {
+    #[cfg(target_os = "windows")]
+    let name = "yt-dlp.exe";
+    #[cfg(not(target_os = "windows"))]
+    let name = "yt-dlp";
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            // `tauri build` places declared resources next to the binary, either
+            // directly or under a `resources/` subfolder depending on target.
+            for cand in [dir.join("resources").join(name), dir.join(name)] {
+                if cand.is_file() {
+                    return cand.into_os_string();
+                }
+            }
+        }
+    }
+    name.into()
+}
+
 fn ytdlp() -> Command {
-    let mut c = Command::new("yt-dlp");
+    let mut c = Command::new(ytdlp_program());
     // Force UTF-8 output; otherwise Windows pipes use the locale codepage
     // (e.g. CP949) and non-ASCII titles arrive garbled.
     c.env("PYTHONIOENCODING", "utf-8");

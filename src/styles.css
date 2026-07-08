@@ -1,3 +1,12 @@
+/* Pretendard — locally embedded (no CDN, survives antivirus network blocks) */
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+
 :root {
   --bg: #0a0c11;
   --panel: #10141c;
@@ -26,7 +35,8 @@ body {
 }
 
 body {
-  font-family: "Segoe UI", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+  font-family: "Pretendard Variable", "Segoe UI", system-ui, -apple-system,
+    "Malgun Gothic", sans-serif;
   background: #08090d;
   color: var(--text);
   overflow: hidden;
@@ -64,6 +74,10 @@ body {
   color: var(--yellow);
   font-size: 15px;
 }
+.title-note .aug-dot {
+  display: inline-block;
+  transform: translateY(3px);
+}
 .title-text {
   color: var(--text);
   letter-spacing: 0.2px;
@@ -97,6 +111,17 @@ body {
   width: 22px;
   height: 22px;
   font-size: 11px;
+}
+/* Always-on-top pin: white icon, accent tint when active */
+.win-btn.pin {
+  color: #fff;
+}
+.win-btn.pin svg {
+  display: block;
+}
+.win-btn.pin.active {
+  color: var(--yellow);
+  background: var(--panel-3);
 }
 
 /* ===== Body ===== */
@@ -556,17 +581,25 @@ body {
 }
 .modal-box {
   width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 16px;
+  padding: 20px 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 .modal-title {
   margin: 0 0 4px;
   font-size: 14px;
+}
+.modal-note {
+  margin: -2px 0 6px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 .field {
   display: flex;
