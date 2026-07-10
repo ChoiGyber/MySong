@@ -147,8 +147,11 @@ pub struct YtInfo {
 fn resolve_youtube(url: String) -> Result<YtInfo, String> {
     let out = ytdlp()
         .args([
+            // Prefer m4a/AAC: macOS WebKit (the webview) cannot decode WebM/Opus,
+            // which `bestaudio` otherwise picks — playback aborts. AAC plays on
+            // both macOS WebKit and Windows WebView2.
             "-f",
-            "bestaudio/best",
+            "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/best[ext=m4a]/bestaudio/best",
             "--no-playlist",
             "--get-title",
             "--get-url",
@@ -177,6 +180,57 @@ fn resolve_youtube(url: String) -> Result<YtInfo, String> {
         return Err("오디오 스트림을 찾지 못했습니다".into());
     }
     Ok(YtInfo { title, url: media })
+}
+
+#[derive(Serialize)]
+pub struct YtFile {
+    title: String,
+    path: String,
+}
+
+/// Download a YouTube URL's audio (m4a/AAC) to a temp cache file and return its
+/// local path. Played from disk via the asset protocol — the webview cannot
+/// stream googlevideo directly (no CORS header, and WebKit rejects WebM/Opus).
+/// yt-dlp caches by id, so replays reuse the file.
+#[tauri::command]
+fn download_youtube(url: String) -> Result<YtFile, String> {
+    let dir = std::env::temp_dir().join("mysong-cache");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("캐시 폴더 생성 실패: {e}"))?;
+    let tmpl = dir.join("%(id)s.%(ext)s");
+    let tmpl = tmpl.to_str().ok_or("캐시 경로 오류")?;
+    let out = ytdlp()
+        .args([
+            // m4a/AAC container downloads directly, no ffmpeg re-encode needed.
+            "-f",
+            "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/best[ext=m4a]/bestaudio/best",
+            "--no-playlist",
+            "--no-overwrites",
+            "-o",
+            tmpl,
+            "--print",
+            "after_move:%(title)s\t%(filepath)s",
+            &url,
+        ])
+        .output()
+        .map_err(|e| format!("yt-dlp 실행 실패: {e}"))?;
+    if !out.status.success() {
+        return Err(last_err_line(&out.stderr));
+    }
+    let text = decode_out(&out.stdout);
+    let line = text
+        .lines()
+        .rev()
+        .find(|l| l.contains('\t'))
+        .ok_or("다운로드 결과를 확인하지 못했습니다")?;
+    let (title, path) = line.split_once('\t').unwrap();
+    let path = path.trim().to_string();
+    if path.is_empty() {
+        return Err("오디오 파일을 찾지 못했습니다".into());
+    }
+    Ok(YtFile {
+        title: title.trim().to_string(),
+        path,
+    })
 }
 
 #[derive(Serialize)]
@@ -273,6 +327,7 @@ pub fn run() {
             ytdlp_available,
             youtube_title,
             resolve_youtube,
+            download_youtube,
             youtube_search,
             open_url,
             secret_set,

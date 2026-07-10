@@ -13,7 +13,7 @@ import {
   toAssetSrc,
   ytdlpAvailable,
   youtubeTitle,
-  resolveYoutube,
+  downloadYoutube,
   youtubeSearch,
   openUrl,
 } from "./backend";
@@ -93,9 +93,14 @@ function repairBrokenTitles() {
 // ---------- helpers ----------
 function fmt(s: number): string {
   if (!Number.isFinite(s) || s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
+  s = Math.floor(s);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const ss = String(sec).padStart(2, "0");
+  // 1시간 이상이면 시:분:초, 미만이면 시간 부분 생략(분:초)
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${ss}`;
+  return `${m}:${ss}`;
 }
 
 function fillRange(input: HTMLInputElement, color = "#ffcf33") {
@@ -200,14 +205,14 @@ async function playTrack(id: string) {
         return;
       }
       updateMarquee("불러오는 중…  " + t.title);
-      const info = await resolveYoutube(t.url);
+      const info = await downloadYoutube(t.url);
       if (info.title && t.title === t.url) {
         t.title = info.title;
         pl.render();
         save();
       }
       updateMarquee(t.title);
-      await audio.play(info.url);
+      await audio.play(toAssetSrc(info.path));
     }
   } catch (e: any) {
     updateMarquee(t.title);

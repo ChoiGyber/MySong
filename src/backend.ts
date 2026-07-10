@@ -12,6 +12,11 @@ export interface YtInfo {
   url: string;
 }
 
+export interface YtFile {
+  title: string;
+  path: string;
+}
+
 /** Open the OS folder picker. Returns the chosen path or null. */
 export async function pickFolder(): Promise<string | null> {
   const res = await open({ directory: true, multiple: false, title: "폴더 선택" });
@@ -41,6 +46,11 @@ export function youtubeTitle(url: string): Promise<string> {
 /** Resolve a YouTube URL to a fresh direct audio stream URL (+ title). */
 export function resolveYoutube(url: string): Promise<YtInfo> {
   return invoke<YtInfo>("resolve_youtube", { url });
+}
+
+/** Download a YouTube URL's audio to a local temp file (+ title). */
+export function downloadYoutube(url: string): Promise<YtFile> {
+  return invoke<YtFile>("download_youtube", { url });
 }
 
 /** Search YouTube and return the first matching video (title + page URL). */
