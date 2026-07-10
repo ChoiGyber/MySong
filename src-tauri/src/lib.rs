@@ -75,8 +75,16 @@ fn ytdlp_program() -> std::ffi::OsString {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             // `tauri build` places declared resources next to the binary, either
-            // directly or under a `resources/` subfolder depending on target.
-            for cand in [dir.join("resources").join(name), dir.join(name)] {
+            // directly or under a `resources/` subfolder (Windows/Linux). On
+            // macOS they land in the app bundle's `Contents/Resources/` instead
+            // (exe is in `Contents/MacOS/`), so also probe one level up.
+            let mut cands = vec![dir.join("resources").join(name), dir.join(name)];
+            #[cfg(target_os = "macos")]
+            if let Some(contents) = dir.parent() {
+                cands.push(contents.join("Resources").join("resources").join(name));
+                cands.push(contents.join("Resources").join(name));
+            }
+            for cand in cands {
                 if cand.is_file() {
                     return cand.into_os_string();
                 }
