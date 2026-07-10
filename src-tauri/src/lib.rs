@@ -63,14 +63,15 @@ fn scan_folder(path: String) -> Vec<TrackFile> {
     out
 }
 
-/// Resolve the yt-dlp binary. Prefer the copy bundled with the app (so it works
-/// with no system install and survives antivirus blocking of network installs),
-/// then fall back to `yt-dlp` on PATH.
-fn ytdlp_program() -> std::ffi::OsString {
+/// Resolve a bundled helper binary by base name (`yt-dlp`, `ffmpeg`, …).
+/// Prefer the copy bundled with the app (works with no system install), then
+/// fall back to the bare name so the OS resolves it on PATH. Returns the full
+/// path when a bundled copy is found, otherwise the bare (PATH) name.
+fn resolve_binary(base: &str) -> std::path::PathBuf {
     #[cfg(target_os = "windows")]
-    let name = "yt-dlp.exe";
+    let name = format!("{base}.exe");
     #[cfg(not(target_os = "windows"))]
-    let name = "yt-dlp";
+    let name = base.to_string();
 
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -78,20 +79,33 @@ fn ytdlp_program() -> std::ffi::OsString {
             // directly or under a `resources/` subfolder (Windows/Linux). On
             // macOS they land in the app bundle's `Contents/Resources/` instead
             // (exe is in `Contents/MacOS/`), so also probe one level up.
-            let mut cands = vec![dir.join("resources").join(name), dir.join(name)];
+            let mut cands = vec![dir.join("resources").join(&name), dir.join(&name)];
             #[cfg(target_os = "macos")]
             if let Some(contents) = dir.parent() {
-                cands.push(contents.join("Resources").join("resources").join(name));
-                cands.push(contents.join("Resources").join(name));
+                cands.push(contents.join("Resources").join("resources").join(&name));
+                cands.push(contents.join("Resources").join(&name));
             }
             for cand in cands {
                 if cand.is_file() {
-                    return cand.into_os_string();
+                    return cand;
                 }
             }
         }
     }
-    name.into()
+    std::path::PathBuf::from(name)
+}
+
+fn ytdlp_program() -> std::ffi::OsString {
+    resolve_binary("yt-dlp").into_os_string()
+}
+
+/// Full path to a usable ffmpeg, if one is bundled. Passed to yt-dlp via
+/// `--ffmpeg-location` so its FixupM4a step can rewrite the fragmented DASH
+/// audio YouTube serves into a single-`moov` (seekable) m4a. Returns None when
+/// no bundled copy exists — then yt-dlp falls back to any ffmpeg on PATH.
+fn ffmpeg_location() -> Option<std::ffi::OsString> {
+    let p = resolve_binary("ffmpeg");
+    p.is_file().then(|| p.into_os_string())
 }
 
 fn ytdlp() -> Command {
@@ -202,23 +216,32 @@ pub struct YtFile {
 /// yt-dlp caches by id, so replays reuse the file.
 #[tauri::command]
 fn download_youtube(url: String) -> Result<YtFile, String> {
-    let dir = std::env::temp_dir().join("mysong-cache");
+    // `-v2`: bump when the download recipe changes so stale files from an older
+    // recipe (e.g. fragmented, non-seekable m4a) are re-fetched, not reused.
+    let dir = std::env::temp_dir().join("mysong-cache-v2");
     std::fs::create_dir_all(&dir).map_err(|e| format!("캐시 폴더 생성 실패: {e}"))?;
     let tmpl = dir.join("%(id)s.%(ext)s");
     let tmpl = tmpl.to_str().ok_or("캐시 경로 오류")?;
-    let out = ytdlp()
-        .args([
-            // m4a/AAC container downloads directly, no ffmpeg re-encode needed.
-            "-f",
-            "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/best[ext=m4a]/bestaudio/best",
-            "--no-playlist",
-            "--no-overwrites",
-            "-o",
-            tmpl,
-            "--print",
-            "after_move:%(title)s\t%(filepath)s",
-            &url,
-        ])
+    let mut cmd = ytdlp();
+    cmd.args([
+        // m4a/AAC container downloads directly, no re-encode needed.
+        "-f",
+        "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/best[ext=m4a]/bestaudio/best",
+        "--no-playlist",
+        "--no-overwrites",
+        "-o",
+        tmpl,
+        "--print",
+        "after_move:%(title)s\t%(filepath)s",
+    ]);
+    // With ffmpeg, yt-dlp's FixupM4a rewrites YouTube's fragmented (moof-based)
+    // DASH audio into a single-`moov` m4a. Without it, long videos have no seek
+    // index and seeking produces silence — audio plays but scrubbing fails.
+    if let Some(ff) = ffmpeg_location() {
+        cmd.arg("--ffmpeg-location").arg(ff);
+    }
+    cmd.arg(&url);
+    let out = cmd
         .output()
         .map_err(|e| format!("yt-dlp 실행 실패: {e}"))?;
     if !out.status.success() {
