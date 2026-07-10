@@ -212,7 +212,7 @@ async function playTrack(id: string) {
         save();
       }
       updateMarquee(t.title);
-      await audio.play(toAssetSrc(info.path));
+      await audio.play(info.url);
     }
   } catch (e: any) {
     updateMarquee(t.title);

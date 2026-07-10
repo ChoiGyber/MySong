@@ -1,6 +1,8 @@
 use std::fs;
-use std::path::Path;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use serde::Serialize;
 
@@ -61,6 +63,113 @@ fn scan_folder(path: String) -> Vec<TrackFile> {
     scan_dir(Path::new(&path), &mut out, 0);
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     out
+}
+
+/// Directory holding downloaded YouTube audio. `-v2` marks the download recipe;
+/// bump it when the recipe changes so stale files are re-fetched.
+fn cache_dir() -> PathBuf {
+    std::env::temp_dir().join("mysong-cache-v2")
+}
+
+// A tiny localhost HTTP server that streams cached audio files with Range
+// support. The webview's asset protocol (`convertFileSrc`) fails to hand very
+// large files (multi-hour YouTube audio) to WebKit — it reports "operation not
+// supported" — whereas WebKit's ordinary HTTP media loader streams them fine
+// and fetches only the byte ranges it needs (so seeking works at any length).
+static MEDIA_PORT: OnceLock<u16> = OnceLock::new();
+
+/// Start the media server once and return its port. Serves files from
+/// `cache_dir()` only, by bare file name.
+fn ensure_media_server() -> u16 {
+    *MEDIA_PORT.get_or_init(|| {
+        let server = tiny_http::Server::http("127.0.0.1:0").expect("bind media server");
+        let port = server
+            .server_addr()
+            .to_ip()
+            .expect("media server addr")
+            .port();
+        std::thread::spawn(move || {
+            for req in server.incoming_requests() {
+                std::thread::spawn(move || {
+                    let _ = serve_media(req);
+                });
+            }
+        });
+        port
+    })
+}
+
+fn header(k: &str, v: &str) -> tiny_http::Header {
+    tiny_http::Header::from_bytes(k.as_bytes(), v.as_bytes()).unwrap()
+}
+
+/// Serve one request: `GET /<name>` streams `cache_dir()/<name>`, honoring a
+/// `Range` header (206 + Content-Range). Only plain file names are accepted.
+fn serve_media(req: tiny_http::Request) -> std::io::Result<()> {
+    let cors = header("Access-Control-Allow-Origin", "*");
+    let name = req
+        .url()
+        .trim_start_matches('/')
+        .split('?')
+        .next()
+        .unwrap_or("")
+        .to_string();
+    if name.is_empty() || name.contains('/') || name.contains("..") {
+        return req.respond(tiny_http::Response::empty(404).with_header(cors));
+    }
+    let path = cache_dir().join(&name);
+    let mut file = match std::fs::File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return req.respond(tiny_http::Response::empty(404).with_header(cors)),
+    };
+    let total = file.metadata()?.len();
+    let ctype = header("Content-Type", "audio/mp4");
+    let accept = header("Accept-Ranges", "bytes");
+
+    let range = req
+        .headers()
+        .iter()
+        .find(|h| h.field.equiv("Range"))
+        .map(|h| h.value.as_str().to_string());
+
+    if let Some(spec) = range.as_deref().and_then(|r| r.strip_prefix("bytes=")) {
+        let mut parts = spec.splitn(2, '-');
+        let start: u64 = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+        let end: u64 = parts
+            .next()
+            .filter(|s| !s.trim().is_empty())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(total.saturating_sub(1))
+            .min(total.saturating_sub(1));
+        if total == 0 || start > end {
+            let cr = header("Content-Range", &format!("bytes */{total}"));
+            return req.respond(
+                tiny_http::Response::empty(416)
+                    .with_header(cors)
+                    .with_header(cr),
+            );
+        }
+        let len = end - start + 1;
+        file.seek(SeekFrom::Start(start))?;
+        let cr = header("Content-Range", &format!("bytes {start}-{end}/{total}"));
+        let resp = tiny_http::Response::new(
+            tiny_http::StatusCode(206),
+            vec![cors, ctype, accept, cr],
+            file.take(len),
+            Some(len as usize),
+            None,
+        );
+        return req.respond(resp);
+    }
+
+    let resp = tiny_http::Response::new(
+        tiny_http::StatusCode(200),
+        vec![cors, ctype, accept],
+        file,
+        Some(total as usize),
+        None,
+    );
+    req.respond(resp)
 }
 
 /// Resolve a bundled helper binary by base name (`yt-dlp`, `ffmpeg`, …).
@@ -207,18 +316,17 @@ fn resolve_youtube(url: String) -> Result<YtInfo, String> {
 #[derive(Serialize)]
 pub struct YtFile {
     title: String,
-    path: String,
+    url: String,
 }
 
-/// Download a YouTube URL's audio (m4a/AAC) to a temp cache file and return its
-/// local path. Played from disk via the asset protocol — the webview cannot
-/// stream googlevideo directly (no CORS header, and WebKit rejects WebM/Opus).
-/// yt-dlp caches by id, so replays reuse the file.
+/// Download a YouTube URL's audio (m4a/AAC) to a temp cache file and return a
+/// localhost HTTP URL for it. Served over HTTP (not the asset protocol) so
+/// WebKit streams even very long files with Range requests — the asset protocol
+/// fails on large files, and googlevideo can't be streamed directly (no CORS,
+/// WebM/Opus rejected). yt-dlp caches by id, so replays reuse the file.
 #[tauri::command]
 fn download_youtube(url: String) -> Result<YtFile, String> {
-    // `-v2`: bump when the download recipe changes so stale files from an older
-    // recipe (e.g. fragmented, non-seekable m4a) are re-fetched, not reused.
-    let dir = std::env::temp_dir().join("mysong-cache-v2");
+    let dir = cache_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("캐시 폴더 생성 실패: {e}"))?;
     let tmpl = dir.join("%(id)s.%(ext)s");
     let tmpl = tmpl.to_str().ok_or("캐시 경로 오류")?;
@@ -254,13 +362,16 @@ fn download_youtube(url: String) -> Result<YtFile, String> {
         .find(|l| l.contains('\t'))
         .ok_or("다운로드 결과를 확인하지 못했습니다")?;
     let (title, path) = line.split_once('\t').unwrap();
-    let path = path.trim().to_string();
-    if path.is_empty() {
-        return Err("오디오 파일을 찾지 못했습니다".into());
-    }
+    let path = path.trim();
+    let fname = Path::new(path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .ok_or("오디오 파일을 찾지 못했습니다")?;
+    let port = ensure_media_server();
     Ok(YtFile {
         title: title.trim().to_string(),
-        path,
+        url: format!("http://127.0.0.1:{port}/{fname}"),
     })
 }
 

@@ -14,7 +14,8 @@ export interface YtInfo {
 
 export interface YtFile {
   title: string;
-  path: string;
+  /** localhost HTTP URL of the downloaded audio (served with Range support). */
+  url: string;
 }
 
 /** Open the OS folder picker. Returns the chosen path or null. */
